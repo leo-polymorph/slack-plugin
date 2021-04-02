@@ -78,6 +78,7 @@ public abstract class SlackUserIdResolver extends AbstractDescribableImpl<SlackU
     }
 
     protected abstract String resolveUserId(User user);
+    public abstract String resolveUserIdForEmailAddress(String emailAddress);
 
     @SuppressWarnings("unchecked")
     public List<String> resolveUserIdsForRun(Run run) {

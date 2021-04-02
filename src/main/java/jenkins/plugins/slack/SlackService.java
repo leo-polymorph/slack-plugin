@@ -2,6 +2,7 @@ package jenkins.plugins.slack;
 
 import hudson.FilePath;
 import hudson.model.TaskListener;
+import hudson.model.User;
 import net.sf.json.JSONArray;
 
 public interface SlackService {
@@ -22,4 +23,7 @@ public interface SlackService {
     boolean addReaction(String channelId, String timestamp, String emojiName);
 
     String getResponseString();
+
+    String resolveUserIdForEmailAddress(String email);
+    String findOrResolveUserId(User user);
 }

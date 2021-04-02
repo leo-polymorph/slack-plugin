@@ -37,6 +37,11 @@ public class NoSlackUserIdResolver extends SlackUserIdResolver {
         return null;
     }
 
+    @Override
+    public String resolveUserIdForEmailAddress(String emailAddress) {
+        return emailAddress;
+    }
+
     @Extension
     public static class DescriptorImpl extends SlackUserIdResolverDescriptor {
 

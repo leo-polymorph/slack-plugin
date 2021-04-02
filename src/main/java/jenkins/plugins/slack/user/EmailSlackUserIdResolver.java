@@ -96,21 +96,40 @@ public class EmailSlackUserIdResolver extends SlackUserIdResolver {
             return null;
         }
 
-       return mailAddressResolvers.stream()
+        if (user == null || user.getProperty(hudson.tasks.Mailer.UserProperty.class) == null)
+        {
+            return null;
+        }
+
+        String email = user.getProperty(hudson.tasks.Mailer.UserProperty.class).getAddress();
+
+        if (StringUtils.isNotEmpty(email))
+        {
+            String userId = resolveUserIdForEmailAddress(email);
+
+            if (StringUtils.isNotEmpty(userId))
+            {
+                return userId;
+            }
+        }
+
+        return null;
+
+       /*return mailAddressResolvers.stream()
             .map(resolver -> {
                 try {
                     return resolver.findMailAddressFor(user);
                 } catch (Exception ex) {
                     LOGGER.log(Level.WARNING, String.format(
                         "The email resolver '%s' failed", resolver.getClass().getName()), ex);
-                    return null;
+                    return "";
               }
             })
             .filter(StringUtils::isNotEmpty)
             .map(this::resolveUserIdForEmailAddress)
             .filter(StringUtils::isNotEmpty)
             .findAny()
-            .orElse(null);
+            .orElse(null);*/
     }
 
     public String resolveUserIdForEmailAddress(String emailAddress) {

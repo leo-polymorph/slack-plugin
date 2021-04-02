@@ -1,7 +1,7 @@
 package jenkins.plugins.slack;
 
 import jenkins.plugins.slack.matrix.MatrixTriggerMode;
-import jenkins.plugins.slack.user.SlackUserIdResolver;
+import jenkins.plugins.slack.user.EmailSlackUserIdResolver;
 
 public class SlackNotifierBuilder {
     String baseUrl;
@@ -36,7 +36,7 @@ public class SlackNotifierBuilder {
     String customMessageNotBuilt;
     String customMessageUnstable;
     String customMessageFailure;
-    SlackUserIdResolver slackUserIdResolver;
+    EmailSlackUserIdResolver slackUserIdResolver;
 
     SlackNotifierBuilder() {
     }
@@ -201,7 +201,7 @@ public class SlackNotifierBuilder {
         return this;
     }
 
-    public SlackNotifierBuilder withSlackUserIdResolver(SlackUserIdResolver slackUserIdResolver) {
+    public SlackNotifierBuilder withSlackUserIdResolver(EmailSlackUserIdResolver slackUserIdResolver) {
         this.slackUserIdResolver = slackUserIdResolver;
         return this;
     }

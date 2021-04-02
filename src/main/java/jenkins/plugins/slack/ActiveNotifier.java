@@ -7,6 +7,7 @@ import hudson.model.Cause;
 import hudson.model.CauseAction;
 import hudson.model.Result;
 import hudson.model.Run;
+import hudson.model.User;
 import hudson.scm.ChangeLogSet;
 import hudson.scm.ChangeLogSet.AffectedFile;
 import hudson.scm.ChangeLogSet.Entry;
@@ -16,6 +17,7 @@ import hudson.triggers.SCMTrigger;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -127,9 +129,36 @@ public class ActiveNotifier implements FineGrainedNotifier {
                 if (notifier.getCommitInfoChoice().showAnything()) {
                     message = message + "\n" + getCommitList(r);
                 }
+
+                message += getAuthorsList(r);
+
                 slackFactory.apply(r).publish(message, getBuildColor(r));
                 if (notifier.getUploadFiles()) {
                     slackFactory.apply(r).upload(r.getWorkspace(), notifier.getArtifactIncludes(), log.getTaskListener());
+                }
+
+                AbstractBuild b = r;
+                int failCount = 0;
+
+                while (true) {
+                    if (b.getResult() != Result.SUCCESS && b.getResult() != Result.ABORTED) {
+                        ++failCount;
+                    }
+
+                    if (b.getResult() == Result.SUCCESS || b.getPreviousBuild() == null || b.getPreviousBuild().getResult() == Result.SUCCESS) {
+                        break;
+                    }
+
+                    b = b.getPreviousBuild();
+                }
+
+                if (failCount > 5)
+                {
+                    slackFactory.apply(r).publish(randomSmiley(SMILEY_FAIL_TOO_MUCH));
+                }
+                else if (failCount == 3 || (failCount > 3 && Math.random() < 0.3))
+                {
+                    slackFactory.apply(r).publish(randomSmiley(SMILEY_FAIL_TWICE));
                 }
             }
         }
@@ -216,10 +245,107 @@ public class ActiveNotifier implements FineGrainedNotifier {
             }
             commits.add(commit.toString());
         }
-        MessageBuilder message = new MessageBuilder(notifier, r, log, tokenExpander);
-        message.append("Changes:\n- ");
-        message.append(StringUtils.join(commits, "\n- "));
-        return message.toString();
+        //MessageBuilder message = new MessageBuilder(notifier, r, log, tokenExpander);
+        String message = "Changes:\n\t- ";
+        message += StringUtils.join(commits, "\n\t- ");
+        return message;
+    }
+
+    private String randomSmiley(String[] smileys)
+    {
+        double rnd = Math.random() * smileys.length;
+
+        for(int i = 0; i < smileys.length; ++i)
+        {
+            if (rnd <= i)
+            {
+                return ":" + smileys[i] + ":";
+            }
+        }
+
+        return ":" + smileys[0] + ":";
+    }
+
+    private static String[] SMILEY_BACK_TO_NORMAL = {
+            "heart", "raised_hands", "beers", "+1", "pray",
+            "tada", "kissing_heart", "heart_eyes",
+            "smiling_face_with_3_hearts", "star-struck",
+            "partying_face", "sunglasses", "heart_eyes_cat",
+            "100", "muscle"
+    };
+
+    private static String[] SMILEY_BACK_TO_NORMAL_WITHOUT_ATHOR = {
+            "face_with_hand_over_mouth", "sweat_smile",
+            "man-shrugging", "beer", "grin"
+    };
+
+    private static String[] SMILEY_NO_AUTHOR = {
+            "thinking_face", "face_with_raised_eyebrow"
+    };
+
+    private static String[] SMILEY_FAIL_TWICE = {
+            "scream", "neutral_face", "unamused", "dizzy_face", "face_with_thermometer",
+            "mask", "sneezing_face", "pleading_face"
+    };
+
+    private static String[] SMILEY_FAIL_TOO_MUCH = {
+            "triumph", "rage", "man-facepalming"
+    };
+
+    String getAuthorsList(AbstractBuild r) {
+        SlackService slackService = slackFactory.apply(r);
+        LinkedHashSet<User> users = new LinkedHashSet<>();
+
+        AbstractBuild b = r;
+        AbstractBuild lastNonAborted = getLastNonAbortedBuild(r);
+        boolean backToNormal = (b.getResult() == Result.SUCCESS && lastNonAborted != null && lastNonAborted.getResult() != Result.SUCCESS);
+
+        while (true) {
+            ChangeLogSet changeSet = b.getChangeSet();
+
+            for (Object o : changeSet.getItems()) {
+                Entry entry = (Entry) o;
+                users.add(entry.getAuthor());
+            }
+
+            if (backToNormal || b.getResult() == Result.SUCCESS || b.getPreviousBuild() == null || b.getPreviousBuild().getResult() == Result.SUCCESS) {
+                break;
+            }
+
+            b = b.getPreviousBuild();
+        }
+
+        String message = "";
+
+        if (b.getResult() != Result.SUCCESS || backToNormal) {
+            message += "\n";
+
+            if (users.size() < 2) {
+                message += "*Author:*";
+            } else {
+                message += "*Authors:*";
+            }
+
+            if (users.size() > 0) {
+                for (User user : users) {
+                    message += " <@" + slackService.findOrResolveUserId(user) + ">";
+                }
+
+                if (backToNormal) {
+                    message += " " + randomSmiley(SMILEY_BACK_TO_NORMAL);
+                }
+            } else {
+                message += " None ";
+
+                if (backToNormal) {
+                    message += randomSmiley(SMILEY_BACK_TO_NORMAL_WITHOUT_ATHOR);
+                } else {
+                    message += randomSmiley(SMILEY_NO_AUTHOR);
+                }
+            }
+        }
+
+        return message;
     }
 
     static String getBuildColor(AbstractBuild r) {
@@ -248,6 +374,15 @@ public class ActiveNotifier implements FineGrainedNotifier {
             message.appendCustomMessage(r.getResult());
         }
         return message.toString();
+    }
+
+    private static AbstractBuild getLastNonAbortedBuild(AbstractBuild build)
+    {
+        AbstractBuild b = build.getPreviousBuild();
+        while (b != null && b.getResult() == Result.ABORTED) {
+            b = b.getPreviousBuild();
+        }
+        return b;
     }
 
     public static class MessageBuilder {
@@ -302,11 +437,7 @@ public class ActiveNotifier implements FineGrainedNotifier {
                      * I.e. if build 1 was failure, build 2 was aborted and build 3 was a success the transition
                      * should be failure -> success (and therefore back to normal) not aborted -> success.
                      */
-                    Run lastNonAbortedBuild = previousBuild;
-                    while (lastNonAbortedBuild != null && lastNonAbortedBuild.getResult() == Result.ABORTED) {
-                        lastNonAbortedBuild = lastNonAbortedBuild.getPreviousBuild();
-                    }
-
+                    Run lastNonAbortedBuild = getLastNonAbortedBuild(r);
 
                     /* If all previous builds have been aborted, then use
                      * SUCCESS as a default status so an aborted message is sent
@@ -363,9 +494,11 @@ public class ActiveNotifier implements FineGrainedNotifier {
         }
 
         private MessageBuilder startMessage() {
+            message.append("*");
             message.append(this.escape(build.getProject().getFullDisplayName()));
             message.append(" - ");
             message.append(this.escape(build.getDisplayName()));
+            message.append("*");
             message.append(" ");
             return this;
         }

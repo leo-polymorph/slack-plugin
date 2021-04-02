@@ -6,6 +6,7 @@ import hudson.ProxyConfiguration;
 import hudson.Util;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import hudson.model.User;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -154,6 +155,36 @@ public class StandardSlackService implements SlackService {
 
     public String getResponseString() {
         return responseString;
+    }
+
+    @Override
+    public String resolveUserIdForEmailAddress(String email) {
+        String result = email;
+        try (CloseableHttpClient client = getHttpClient()) {
+            if (botUser && userIdResolver != null) {
+                userIdResolver.setAuthToken(populatedToken);
+                userIdResolver.setHttpClient(client);
+                result = userIdResolver.resolveUserIdForEmailAddress(email);
+            }
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Error closing HttpClient", e);
+        }
+        return result;
+    }
+
+    @Override
+    public String findOrResolveUserId(User user) {
+        String result = user.getDisplayName();
+        try (CloseableHttpClient client = getHttpClient()) {
+            if (botUser && userIdResolver != null) {
+                userIdResolver.setAuthToken(populatedToken);
+                userIdResolver.setHttpClient(client);
+                result = userIdResolver.findOrResolveUserId(user);
+            }
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Error closing HttpClient", e);
+        }
+        return result;
     }
 
     public boolean publish(String message) {
