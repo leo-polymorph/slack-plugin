@@ -2,6 +2,7 @@ package jenkins.plugins.slack;
 
 import hudson.FilePath;
 import hudson.model.TaskListener;
+import hudson.model.User;
 import hudson.util.FormValidation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -100,6 +101,16 @@ public class SlackNotifierTest extends TestCase {
 
         public String getResponseString() {
             return null;
+        }
+
+        @Override
+        public String resolveUserIdForEmailAddress(String email) {
+            return email;
+        }
+
+        @Override
+        public String findOrResolveUserId(User user) {
+            return user.getDisplayName();
         }
 
         @Override
